@@ -263,6 +263,12 @@ object Dependencies {
     )
   )
 
+  val Stomp = Seq(
+    libraryDependencies ++= Seq(
+      "io.vertx" % "vertx-stomp-scala" % "3.5.1" // ApacheV2
+    )
+  )
+
   val UnixDomainSocket = Seq(
     libraryDependencies ++= Seq(
       "com.github.jnr" % "jnr-unixsocket" % "0.18" // BSD/ApacheV2/CPL/MIT as per https://github.com/akka/alpakka/issues/620#issuecomment-348727265
