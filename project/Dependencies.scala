@@ -265,7 +265,8 @@ object Dependencies {
 
   val Stomp = Seq(
     libraryDependencies ++= Seq(
-      "io.vertx" % "vertx-stomp-scala" % "3.5.1" // ApacheV2
+      // https://mvnrepository.com/artifact/io.vertx/vertx-stomp
+      "io.vertx" % "vertx-stomp" % "3.5.1" // ApacheV2/EPL1
     )
   )
 
