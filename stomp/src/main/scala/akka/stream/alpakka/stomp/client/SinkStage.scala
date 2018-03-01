@@ -86,14 +86,11 @@ object SinkStage {
 }
 
 // @TODO: better semantics to this exception
-case class StompProtocolError(frame: Frame) extends Throwable
+sealed trait StompThrowable extends Throwable
+case class StompProtocolError(frame: Frame) extends StompThrowable
 
-case class StompClientConnectionDropped(str: String = "") extends Throwable
+case class StompClientConnectionDropped(str: String = "") extends StompThrowable
 
-case class StompSinkStageFailedCommand(str: String = "Only SEND command is accepted in StompSink") extends Throwable
+case class IncorrectCommand(str: String = "Only SEND command is accepted in StompSink") extends StompThrowable
 
-case class StompSinkUnexpectedReceiptId(str: String = "") extends Throwable
-
-case class StompUnexpectedCommandWhileWaitingForReceiptId(str: String = "") extends Throwable
-
-case class StompBadReceipt(str: String) extends Throwable
+case class StompBadReceipt(str: String) extends StompThrowable
