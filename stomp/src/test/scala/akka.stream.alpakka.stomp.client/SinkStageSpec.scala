@@ -24,7 +24,7 @@ class SinkStageSpec extends WordSpec with Matchers with BeforeAndAfterAll with B
   val system = ActorSystem(this.getClass.getSimpleName)
   implicit val materializer = ActorMaterializer()(system)
 
-  override implicit val patienceConfig = PatienceConfig(2.seconds)
+  override implicit val patienceConfig = PatienceConfig(1000.seconds)
   private implicit val executionContext = ExecutionContexts.sameThreadExecutionContext
 
   val vertx: Vertx = Vertx.vertx()
@@ -80,11 +80,11 @@ class SinkStageSpec extends WordSpec with Matchers with BeforeAndAfterAll with B
       val settings = ConnectorSettings()
 
       import scala.concurrent.duration._
-      val stompClientConnection: StompClientConnection = settings.connectionProvider.get(FiniteDuration(3, SECONDS))
-      val sinkToStomp: Sink[Frame, Future[Done]] = Sink.fromGraph(new SinkStage(settings, stompClientConnection))
+      val sinkToStomp: Sink[Frame, Future[Done]] = Sink.fromGraph(new SinkStage(settings))
       val queueSource: Source[Frame, SourceQueueWithComplete[Frame]] =
         Source.queue[Frame](100, OverflowStrategy.backpressure)
-      val queue: SourceQueueWithComplete[Frame] = queueSource.to(sinkToStomp).run()(materializer)
+//      val queue: SourceQueueWithComplete[Frame] = queueSource.to(sinkToStomp).run()(materializer)
+      val (queue, sinkDone) = queueSource.toMat(sinkToStomp)(Keep.both).run()
 
       (1 to size)
         .map(i => s"$i")
@@ -97,7 +97,8 @@ class SinkStageSpec extends WordSpec with Matchers with BeforeAndAfterAll with B
         }
       queue.complete()
 
-      queue.watchCompletion().futureValue shouldBe Done
+//      queue.watchCompletion().futureValue shouldBe Done
+      sinkDone.futureValue shouldBe Done
 
       receivedFrameOnServer
         .result()
