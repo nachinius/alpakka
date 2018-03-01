@@ -66,7 +66,7 @@ private[client] trait ConnectorLogic {
 
   def checkCommand(frame: Frame) =
     if (!acceptedCommands.contains(frame.getCommand)) {
-      failStage(StompSinkStageFailedCommand())
+      failStage(IncorrectCommand())
     }
 
   private def prepareExpectationOnReceipt(originalFrame: Frame) =
