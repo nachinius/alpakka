@@ -10,50 +10,82 @@ import akka.Done
 import akka.stream.stage.GraphStageLogic
 import io.vertx.ext.stomp.{Frame, StompClient, StompClientConnection}
 
+import scala.concurrent.Promise
 import scala.util.control.NonFatal
 
 private[client] trait ConnectorLogic {
   this: GraphStageLogic =>
-  private[client] var connection: StompClientConnection = _
 
+  var expectedReceiptId: Option[String] = None
   def settings: ConnectorSettings
+  def connection: StompClientConnection
+  def acceptedCommands: Set[Frame.Command]
+  def promise: Promise[Done]
 
   def whenConnected: Unit
 
   def onFailure(ex: Throwable): Unit
 
-  final override def preStart(): Unit =
-    try {
-      val client: StompClient = settings.connectionProvider.get.connect({ ar =>
-        if (ar.succeeded()) {
-          connection = ar.result()
-          whenConnected
-        } else {
-          throw ar.cause()
-        }
-      })
-      // TCP level errors
-      client exceptionHandler (ex => failStage(ex))
+  final override def preStart(): Unit = {
 
-      // By protocol an error frame closes the connection
-      client errorFrameHandler { frame =>
-        failStage(
-          new Exception("ERROR FRAME " + frame.toString)
-        )
-      }
+    val failCallback = getAsyncCallback[Throwable](ex => {
+      promise.failure(ex)
+      failStage(ex)
+    })
+    val closeCallback = getAsyncCallback[Unit](_ => {
+      promise.success(Done)
+      completeStage()
+    })
+    val errorCallback = getAsyncCallback[Frame](frame => {
+      val ex = StompProtocolError(frame)
+      failCallback.invoke(ex)
+    })
+    val dropCallback = getAsyncCallback[StompClientConnection](dropped => {
+      val ex = StompClientConnectionDropped(dropped.toString)
+      failCallback.invoke(ex)
+    })
+    val checkRequestIdCallback = getAsyncCallback[Frame](frame => {
+      checkForRequestIdIfExpected(frame)
+    })
 
-      //      client receivedFrameHandler( identity _ )
-      //      client writingFrameHandler( identity _ )
+    connection.exceptionHandler(ex => failCallback.invoke(ex))
+    connection.closeHandler(_ => closeCallback.invoke(()))
+    connection.errorHandler(frame => errorCallback.invoke(frame))
 
-    } catch {
-      case NonFatal(e) =>
-        onFailure(e)
-        throw e
-    }
+    // for implementing debugging functionality
+    // connection.writingFrameHandler(frame => doSomethingWithFrameLikeChangingOrInspecting(frame))
+
+    connection.connectionDroppedHandler(dropped => dropCallback.invoke(dropped))
+    connection.receivedFrameHandler(frame => checkRequestIdCallback.invoke(frame))
+    whenConnected
+  }
 
   /** remember to call if overriding! */
   override def postStop(): Unit =
-    connection.disconnect()
+    if (connection.isConnected) connection.disconnect()
 
+  def checkCommand(frame: Frame) =
+    if (!acceptedCommands.contains(frame.getCommand)) {
+      failStage(StompSinkStageFailedCommand())
+    }
+
+  private def prepareExpectationOnReceipt(originalFrame: Frame) =
+    if (originalFrame.getHeaders.containsKey(Frame.RECEIPT)) {
+      expectedReceiptId = Some(originalFrame.getHeader(Frame.RECEIPT))
+    }
+
+  def checkForRequestIdIfExpected(frame: Frame) =
+    expectedReceiptId.map { expected =>
+      if (frame.getCommand == Frame.Command.RECEIPT) {
+        if (frame.getHeaders.containsKey(Frame.RECEIPT_ID) && expected == frame.getHeader(Frame.RECEIPT_ID)) {
+          expectedReceiptId = None
+          Right(())
+        } else Left("Bad receipt id or missing header")
+      } else Left("Not a receipt message")
+    } foreach { sol: Either[String, Unit] =>
+      sol match {
+        case Right(_) => ()
+        case Left(str) => failStage(StompBadReceipt(str))
+      }
+    }
 }
-
