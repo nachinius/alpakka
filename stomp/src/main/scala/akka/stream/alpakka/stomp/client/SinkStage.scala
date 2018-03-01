@@ -12,7 +12,7 @@ import io.vertx.ext.stomp.{Frame => Frame, StompClientConnection}
 import scala.concurrent.{Future, Promise}
 
 // @TODO: must change vertx.*.Frame to a immutable one at the stream level
-final class SinkStage(settings: ConnectorSettings, connection: StompClientConnection)
+final class SinkStage(settings: ConnectorSettings)
     extends GraphStageWithMaterializedValue[SinkShape[Frame], Future[Done]] {
   stage =>
 
@@ -22,14 +22,12 @@ final class SinkStage(settings: ConnectorSettings, connection: StompClientConnec
     val thePromise = Promise[Done]()
     (new GraphStageLogic(shape) with ConnectorLogic {
       override val settings: ConnectorSettings = stage.settings
-      override val connection: StompClientConnection = stage.connection
       override val acceptedCommands: Set[Frame.Command] = Set(Frame.Command.SEND)
       override val promise = thePromise
       //      private val destination = settings.destination
       //      private val requestReceiptHandler: Option[Frame => ()] = settings.requestReceiptHandler
 
-      override def whenConnected: Unit =
-        pull(in)
+      override def whenConnected: Unit = pull(in)
 
       setHandler(
         in,

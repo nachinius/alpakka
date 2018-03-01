@@ -4,60 +4,70 @@
 
 package akka.stream.alpakka.stomp.client
 
-import java.util.Optional
-
 import akka.Done
 import akka.stream.stage.GraphStageLogic
-import io.vertx.ext.stomp.{Frame, StompClient, StompClientConnection}
+import io.vertx.core.Vertx
+import io.vertx.core.json.JsonObject
+import io.vertx.ext.stomp.{Frame, StompClient, StompClientConnection, StompClientOptions}
 
 import scala.concurrent.Promise
-import scala.util.control.NonFatal
 
 private[client] trait ConnectorLogic {
   this: GraphStageLogic =>
 
   var expectedReceiptId: Option[String] = None
-  def settings: ConnectorSettings
-  def connection: StompClientConnection
-  def acceptedCommands: Set[Frame.Command]
-  def promise: Promise[Done]
-
-  def whenConnected: Unit
-
-  def onFailure(ex: Throwable): Unit
+  var connection: StompClientConnection = _
 
   final override def preStart(): Unit = {
+    def addHandlers(connection: StompClientConnection) = {
+      val failCallback = getAsyncCallback[Throwable](ex => {
+        promise.failure(ex)
+        failStage(ex)
+      })
+      val closeCallback = getAsyncCallback[Unit](_ => {
+        promise.success(Done)
+        completeStage()
+      })
+      val errorCallback = getAsyncCallback[Frame](frame => {
+        val ex = StompProtocolError(frame)
+        failCallback.invoke(ex)
+      })
+      val dropCallback = getAsyncCallback[StompClientConnection](dropped => {
+        val ex = StompClientConnectionDropped(dropped.toString)
+        failCallback.invoke(ex)
+      })
+      val checkRequestIdCallback = getAsyncCallback[Frame](frame => {
+        checkForRequestIdIfExpected(frame)
+      })
 
-    val failCallback = getAsyncCallback[Throwable](ex => {
-      promise.failure(ex)
-      failStage(ex)
-    })
-    val closeCallback = getAsyncCallback[Unit](_ => {
-      promise.success(Done)
-      completeStage()
-    })
-    val errorCallback = getAsyncCallback[Frame](frame => {
-      val ex = StompProtocolError(frame)
-      failCallback.invoke(ex)
-    })
-    val dropCallback = getAsyncCallback[StompClientConnection](dropped => {
-      val ex = StompClientConnectionDropped(dropped.toString)
-      failCallback.invoke(ex)
-    })
-    val checkRequestIdCallback = getAsyncCallback[Frame](frame => {
-      checkForRequestIdIfExpected(frame)
+      connection.exceptionHandler(ex => failCallback.invoke(ex))
+      connection.closeHandler(_ => closeCallback.invoke(()))
+      connection.errorHandler(frame => errorCallback.invoke(frame))
+
+      // for implementing debugging functionality
+      // connection.writingFrameHandler(frame => doSomethingWithFrameLikeChangingOrInspecting(frame))
+
+      connection.connectionDroppedHandler(dropped => dropCallback.invoke(dropped))
+      connection.receivedFrameHandler(frame => checkRequestIdCallback.invoke(frame))
+    }
+
+    val connectCallback = getAsyncCallback[StompClientConnection](conn => {
+      connection = conn
+      addHandlers(connection)
+      whenConnected
     })
 
-    connection.exceptionHandler(ex => failCallback.invoke(ex))
-    connection.closeHandler(_ => closeCallback.invoke(()))
-    connection.errorHandler(frame => errorCallback.invoke(frame))
-
-    // for implementing debugging functionality
-    // connection.writingFrameHandler(frame => doSomethingWithFrameLikeChangingOrInspecting(frame))
-
-    connection.connectionDroppedHandler(dropped => dropCallback.invoke(dropped))
-    connection.receivedFrameHandler(frame => checkRequestIdCallback.invoke(frame))
-    whenConnected
+    // connecting async
+    settings.connectionProvider.getStompClient
+      .connect(
+        ar => {
+          if (ar.succeeded()) {
+            connectCallback.invoke(ar.result())
+          } else {
+            throw ar.cause()
+          }
+        }
+      )
   }
 
   /** remember to call if overriding! */
@@ -88,4 +98,15 @@ private[client] trait ConnectorLogic {
         case Left(str) => failStage(StompBadReceipt(str))
       }
     }
+
+  def settings: ConnectorSettings
+
+  def acceptedCommands: Set[Frame.Command]
+
+  def promise: Promise[Done]
+
+  def whenConnected: Unit
+
+  def onFailure(ex: Throwable): Unit
+
 }
