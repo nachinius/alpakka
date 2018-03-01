@@ -31,6 +31,8 @@ sealed trait ConnectionProvider {
 
   def get(atMost: Duration = atMost): StompClientConnection = Await.result(getFuture, atMost)
 
+  def getStompClient: StompClient = StompClient.create(Vertx.vertx(), new StompClientOptions())
+
   def release(connection: StompClientConnection) = connection.disconnect()
 
   def release(connection: StompClient) = connection.close()
