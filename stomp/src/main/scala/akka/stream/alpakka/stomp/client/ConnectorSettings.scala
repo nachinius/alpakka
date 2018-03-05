@@ -6,10 +6,9 @@ package akka.stream.alpakka.stomp.client
 
 import io.vertx.core.Vertx
 import io.vertx.core.json.JsonObject
-import io.vertx.ext.stomp.{Frame, StompClient, StompClientConnection, StompClientOptions}
+import io.vertx.ext.stomp.{StompClient, StompClientConnection, StompClientOptions}
 
-import scala.concurrent.duration.{Duration, FiniteDuration}
-import scala.concurrent.{Await, ExecutionContext, Future, Promise}
+import scala.concurrent.{Await, Future, Promise}
 
 object ConnectorSettings {
 
@@ -19,19 +18,22 @@ object ConnectorSettings {
 
 case class ConnectorSettings(
     connectionProvider: ConnectionProvider,
-//                              destination: Option[String] = None,
-//                              requestReceiptHandler: Option[Frame => ()] = None
+    topic: Option[String] = None,
+    withAck: Boolean = false
 )
 
 sealed trait ConnectionProvider {
+
   import scala.concurrent.duration._
+
   val atMost = FiniteDuration(1, SECONDS)
 
   def getFuture: Future[StompClientConnection]
 
   def get(atMost: Duration = atMost): StompClientConnection = Await.result(getFuture, atMost)
 
-  def getStompClient: StompClient = StompClient.create(Vertx.vertx(), new StompClientOptions())
+  def getStompClient: StompClient =
+    StompClient.create(Vertx.vertx(), new StompClientOptions().setHeartbeat(new JsonObject().put("x", 0).put("y", 0)))
 
   def release(connection: StompClientConnection) = connection.disconnect()
 
