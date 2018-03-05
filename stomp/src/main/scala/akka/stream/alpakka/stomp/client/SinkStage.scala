@@ -5,9 +5,9 @@
 package akka.stream.alpakka.stomp.client
 
 import akka.Done
-import akka.stream.{ActorAttributes, Attributes, Inlet, SinkShape}
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, InHandler}
-import io.vertx.ext.stomp.{Frame => Frame, StompClientConnection}
+import akka.stream.{ActorAttributes, Attributes, Inlet, SinkShape}
+import io.vertx.ext.stomp.Frame
 
 import scala.concurrent.{Future, Promise}
 
@@ -15,6 +15,12 @@ import scala.concurrent.{Future, Promise}
 final class SinkStage(settings: ConnectorSettings)
     extends GraphStageWithMaterializedValue[SinkShape[Frame], Future[Done]] {
   stage =>
+
+  override def shape: SinkShape[Frame] = SinkShape.of(in)
+
+  override def toString: String = "StompClientSink"
+
+  override protected def initialAttributes: Attributes = SinkStage.defaultAttributes
 
   val in = Inlet[Frame]("StompClientSink.in")
 
@@ -47,6 +53,8 @@ final class SinkStage(settings: ConnectorSettings)
             val originalFrame = grab(in)
             //            checkCommand(originalFrame)
             //            prepareExpectationOnReceipt(originalFrame)
+            if (settings.topic.nonEmpty)
+              originalFrame.setDestination(settings.topic.get)
             connection.send(originalFrame)
             if (expectedReceiptId.isEmpty) {
               pull(in)
@@ -59,7 +67,7 @@ final class SinkStage(settings: ConnectorSettings)
       )
 
       override def postStop(): Unit = {
-        connection.disconnect()
+        //        if(connection != null) connection.disconnect()
         promise.tryFailure(new RuntimeException("stage stopped unexpectedly"))
         super.postStop()
       }
@@ -70,12 +78,6 @@ final class SinkStage(settings: ConnectorSettings)
     }, thePromise.future)
   }
 
-  override def shape: SinkShape[Frame] = SinkShape.of(in)
-
-  override def toString: String = "StompClientSink"
-
-  override protected def initialAttributes: Attributes = SinkStage.defaultAttributes
-
 }
 
 object SinkStage {
@@ -85,6 +87,7 @@ object SinkStage {
 
 // @TODO: better semantics to this exception
 sealed trait StompThrowable extends Throwable
+
 case class StompProtocolError(frame: Frame) extends StompThrowable
 
 case class StompClientConnectionDropped(str: String = "") extends StompThrowable
