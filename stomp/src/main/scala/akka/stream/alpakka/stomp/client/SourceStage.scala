@@ -7,13 +7,13 @@ package akka.stream.alpakka.stomp.client
 import akka.Done
 import akka.stream._
 import akka.stream.stage._
-import io.vertx.ext.stomp.Frame
+import io.vertx.ext.stomp.{Frame, StompClientConnection}
 
-import scala.collection.{mutable, JavaConverters}
+import scala.collection.{JavaConverters, mutable}
 import scala.concurrent.{Future, Promise}
 
-final class SourceStage(settings: ConnectorSettings, bufferSize: Int)
-    extends GraphStageWithMaterializedValue[SourceShape[Frame], Future[Done]] {
+final class SourceStage(settings: ConnectorSettings)
+  extends GraphStageWithMaterializedValue[SourceShape[Frame], Future[Done]] {
   stage =>
 
   val out = Outlet[Frame]("StompClientSource.out")
@@ -24,53 +24,52 @@ final class SourceStage(settings: ConnectorSettings, bufferSize: Int)
 
       override val settings: ConnectorSettings = stage.settings
 
-      override val promise = thePromise
+      override val promise: Promise[Done] = thePromise
       override val fullFillOnConnection: Boolean = true
 
-      override def acceptedCommands: Set[Frame.Command] = Set(Frame.Command.MESSAGE)
-
-      private val queue = mutable.Queue[Frame]()
-
       private val headers: mutable.Map[String, String] =
-        if (settings.withAck) mutable.Map(Frame.ACK -> "client") else mutable.Map()
+        if (settings.withAck) mutable.Map(Frame.ACK -> "client-individual") else mutable.Map()
 
+      var pending: Option[Frame] = None
       override def whenConnected: Unit = {
-        val receiveMessageCallback = getAsyncCallback[Frame] {
-          if (settings.withAck) { frame =>
-            {
-              connection.ack(frame.getId)
-              handleDelivery(frame)
-            }
-          } else
-            frame => {
-              handleDelivery(frame)
-            }
+        val receiveSubscriptionMessage = getAsyncCallback[Frame] {
+          frame => {
+            pending = Some(frame)
+            handleDelivery(frame)
+          }
+
         }
 
         import JavaConverters._
         connection.subscribe(
           settings.topic.get,
           headers.asJava, { frame =>
-            receiveMessageCallback.invoke(frame)
+            receiveSubscriptionMessage.invoke(frame)
+          }, { frameSubscribe => acknowledge(frameSubscribe)
           }
         )
-        connection.receivedFrameHandler(frame => receiveMessageCallback.invoke(frame))
       }
 
-      def handleDelivery(message: Frame): Unit =
+
+      override def receiveHandler(connection: StompClientConnection): Unit = {
+        connection.receivedFrameHandler( frame => {
+          if(!settings.topic.contains(frame.getDestination)) {
+            acknowledge(frame)
+          }
+        })
+      }
+
+      def handleDelivery(frame: Frame): Unit = {
         if (isAvailable(out)) {
-          pushMessage(message)
-        } else if (queue.size + 1 > bufferSize) {
-          failStage(new RuntimeException(s"Reached maximum buffer size $bufferSize"))
-        } else {
-          queue.enqueue(message)
+          pushMessage(frame)
         }
+      }
 
       setHandler(
         out,
         new OutHandler {
-          override def onPull(): Unit = if (queue.nonEmpty) {
-            pushMessage(queue.dequeue())
+          override def onPull(): Unit = if (pending.nonEmpty) {
+            pushMessage(pending.get)
           }
 
           override def onDownstreamFinish(): Unit =
@@ -78,13 +77,17 @@ final class SourceStage(settings: ConnectorSettings, bufferSize: Int)
         }
       )
 
-      def pushMessage(frame: Frame): Unit =
+
+      def pushMessage(frame: Frame): Unit = {
         push(out, frame)
+        pending = None
+        acknowledge(frame)
+      }
 
-      override def postStop(): Unit =
+      override def postStop(): Unit = {
         promise.trySuccess(Done)
-
-      super.postStop()
+        super.postStop()
+      }
 
       override def onFailure(ex: Throwable): Unit = {
         promise.trySuccess(Done)

@@ -22,42 +22,63 @@ case class ConnectorSettings(
     withAck: Boolean = false
 )
 
-sealed trait ConnectionProvider {
 
-  import scala.concurrent.duration._
+trait ConnectionProvider {
+  def vertx: Vertx = Vertx.vertx()
+  val noHeartBeatObject = new JsonObject().put("x",0).put("y",0)
 
-  val atMost = FiniteDuration(1, SECONDS)
+  def stompClientOptions: StompClientOptions
 
-  def getFuture: Future[StompClientConnection]
+  def get: Future[StompClientConnection] = {
+    val promise = Promise[StompClientConnection]()
+    getStompClient.connect(
+      ar => {
+        if (ar.succeeded()) {
+          promise.trySuccess(ar.result())
+        } else {
+          promise.tryFailure(ar.cause())
+        }
+      }
+    )
+    promise.future
+  }
 
-  def get(atMost: Duration = atMost): StompClientConnection = Await.result(getFuture, atMost)
+  private[client] def getStompClient: StompClient = StompClient.create(vertx, stompClientOptions)
 
-  def getStompClient: StompClient =
-    StompClient.create(Vertx.vertx(), new StompClientOptions().setHeartbeat(new JsonObject().put("x", 0).put("y", 0)))
+  def release(connection: StompClientConnection): StompClientConnection = connection.disconnect()
 
-  def release(connection: StompClientConnection) = connection.disconnect()
-
-  def release(connection: StompClient) = connection.close()
+  def release(connection: StompClient): Unit = connection.close()
 }
 
 /**
  * Connects to a local STOMP server at the default port with no password.
  */
 case object LocalConnectionProvider extends ConnectionProvider {
-  override def getFuture: Future[StompClientConnection] = {
-    val promise = Promise[StompClientConnection]()
-    StompClient
-      .create(Vertx.vertx(), new StompClientOptions().setHeartbeat(new JsonObject().put("x", 0).put("y", 0)))
-      .connect(
-        ar => {
-          if (ar.succeeded()) {
-            promise.trySuccess(ar.result())
-          } else {
-            promise.tryFailure(ar.cause())
-          }
-        }
-      )
-    promise.future
-  }
+  val stompClientOptions: StompClientOptions = DetailsConnectionProvider("0.0.0.0",61613).stompClientOptions.setHeartbeat(noHeartBeatObject)
+}
 
+final case class Credentials(
+                            username: String,
+                            password: String
+                            ) {
+  override def toString: String = s"Credentials($username,*****)"
+}
+
+final case class DetailsConnectionProvider(
+                                          host: String,
+                                          port: Int,
+                                          credentials: Option[Credentials] = None
+                                          ) extends ConnectionProvider {
+
+  def stompClientOptions: StompClientOptions = {
+    val opt = new StompClientOptions()
+    opt.setHost(host)
+    opt.setPort(port)
+    credentials.foreach { c =>
+      opt.setLogin(c.username)
+      opt.setPasscode(c.password)
+    }
+    opt.setHeartbeat(noHeartBeatObject)
+    opt
+  }
 }

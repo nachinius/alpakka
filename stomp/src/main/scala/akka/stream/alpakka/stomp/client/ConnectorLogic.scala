@@ -13,11 +13,12 @@ import scala.concurrent.Promise
 private[client] trait ConnectorLogic {
   this: GraphStageLogic =>
 
-  val closeCallback = getAsyncCallback[Unit](_ => {
-    promise.success(Done)
+  val closeCallback = getAsyncCallback[StompClientConnection](conn => {
+    promise.trySuccess(Done)
     completeStage()
   })
   val errorCallback = getAsyncCallback[Frame](frame => {
+    acknowledge(frame)
     val ex = StompProtocolError(frame)
     failCallback.invoke(ex)
   })
@@ -25,11 +26,8 @@ private[client] trait ConnectorLogic {
     val ex = StompClientConnectionDropped(dropped.toString)
     failCallback.invoke(ex)
   })
-  val checkRequestIdCallback = getAsyncCallback[Frame](frame => {
-    checkForRequestIdIfExpected(frame)
-  })
   val failCallback = getAsyncCallback[Throwable](ex => {
-    promise.failure(ex)
+    promise.tryFailure(ex)
     failStage(ex)
   })
   val fullFillOnConnection = false
@@ -37,8 +35,6 @@ private[client] trait ConnectorLogic {
   var connection: StompClientConnection = _
 
   def settings: ConnectorSettings
-
-  def acceptedCommands: Set[Frame.Command]
 
   def promise: Promise[Done]
 
@@ -50,7 +46,7 @@ private[client] trait ConnectorLogic {
 
     val connectCallback = getAsyncCallback[StompClientConnection](conn => {
       connection = conn
-      addHandlers(connection)
+      addHandlers
       whenConnected
       if (fullFillOnConnection) promise.trySuccess(Done)
     })
@@ -69,22 +65,26 @@ private[client] trait ConnectorLogic {
       )
   }
 
-  def addHandlers(connection: StompClientConnection) = {
+  def acknowledge(frame: Frame) = {
+    if(settings.withAck && frame.getHeaders.containsKey(Frame.ACK)) {
+      println("ack " + frame.getAck)
+      connection.ack(frame.getAck)
+    }
+  }
+
+  def addHandlers = {
     failHandler(connection)
     closeHandler(connection)
     errorHandler(connection)
-    // for implementing debugging functionality
-    // connection.writingFrameHandler(frame => doSomethingWithFrameLikeChangingOrInspecting(frame))
+    writeHandler(connection)
     dropHandler(connection)
     receiveHandler(connection)
     writeHandler(connection)
   }
 
-  def writeHandler(connection: StompClientConnection) =
-    ()
+  def writeHandler(connection: StompClientConnection) = ()
 
-  def receiveHandler(connection: StompClientConnection) =
-    connection.receivedFrameHandler(frame => checkRequestIdCallback.invoke(frame))
+  def receiveHandler(connection: StompClientConnection)
 
   def dropHandler(connection: StompClientConnection) =
     connection.connectionDroppedHandler(dropped => dropCallback.invoke(dropped))
@@ -93,38 +93,13 @@ private[client] trait ConnectorLogic {
     connection.errorHandler(frame => errorCallback.invoke(frame))
 
   def closeHandler(connection: StompClientConnection) =
-    connection.closeHandler(_ => closeCallback.invoke(()))
+    connection.closeHandler(conn => closeCallback.invoke(conn))
 
   private def failHandler(connection: StompClientConnection) =
     connection.exceptionHandler(ex => failCallback.invoke(ex))
 
   /** remember to call if overriding! */
   override def postStop(): Unit =
-    if (connection != null && connection.isConnected) connection.disconnect()
-
-  def checkCommand(frame: Frame) =
-    if (!acceptedCommands.contains(frame.getCommand)) {
-      failStage(IncorrectCommand())
-    }
-
-  def checkForRequestIdIfExpected(frame: Frame) =
-    expectedReceiptId.map { expected =>
-      if (frame.getCommand == Frame.Command.RECEIPT) {
-        if (frame.getHeaders.containsKey(Frame.RECEIPT_ID) && expected == frame.getHeader(Frame.RECEIPT_ID)) {
-          expectedReceiptId = None
-          Right(())
-        } else Left("Bad receipt id or missing header")
-      } else Left("Not a receipt message")
-    } foreach { sol: Either[String, Unit] =>
-      sol match {
-        case Right(_) => ()
-        case Left(str) => failStage(StompBadReceipt(str))
-      }
-    }
-
-  private def prepareExpectationOnReceipt(originalFrame: Frame) =
-    if (originalFrame.getHeaders.containsKey(Frame.RECEIPT)) {
-      expectedReceiptId = Some(originalFrame.getHeader(Frame.RECEIPT))
-    }
+    if (connection.isConnected) connection.disconnect()
 
 }

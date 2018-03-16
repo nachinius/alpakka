@@ -7,7 +7,7 @@ package akka.stream.alpakka.stomp.client
 import akka.Done
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, InHandler}
 import akka.stream.{ActorAttributes, Attributes, Inlet, SinkShape}
-import io.vertx.ext.stomp.Frame
+import io.vertx.ext.stomp.{Frame, StompClientConnection}
 
 import scala.concurrent.{Future, Promise}
 
@@ -28,10 +28,12 @@ final class SinkStage(settings: ConnectorSettings)
     val thePromise = Promise[Done]()
     (new GraphStageLogic(shape) with ConnectorLogic {
       override val settings: ConnectorSettings = stage.settings
-      override val acceptedCommands: Set[Frame.Command] = Set(Frame.Command.SEND)
       override val promise = thePromise
       //      private val destination = settings.destination
       //      private val requestReceiptHandler: Option[Frame => ()] = settings.requestReceiptHandler
+
+
+      override def receiveHandler(connection: StompClientConnection): Unit = ()
 
       override def whenConnected: Unit = pull(in)
 
@@ -85,13 +87,4 @@ object SinkStage {
     Attributes.name("StompClientSink").and(ActorAttributes.dispatcher("akka.stream.default-blocking-io-dispatcher"))
 }
 
-// @TODO: better semantics to this exception
-sealed trait StompThrowable extends Throwable
 
-case class StompProtocolError(frame: Frame) extends StompThrowable
-
-case class StompClientConnectionDropped(str: String = "") extends StompThrowable
-
-case class IncorrectCommand(str: String = "Only SEND command is accepted in StompSink") extends StompThrowable
-
-case class StompBadReceipt(str: String) extends StompThrowable
