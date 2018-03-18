@@ -18,7 +18,7 @@ trait ClientTest extends WordSpec
   implicit val materializer = ActorMaterializer()(system)
 
 
-  val patience = 1.seconds
+  val patience = 2.seconds
 
   override implicit val patienceConfig = PatienceConfig(patience)
   implicit val executionContext = ExecutionContexts.sameThreadExecutionContext
