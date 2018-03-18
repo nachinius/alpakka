@@ -7,7 +7,6 @@ case class SendingFrame(headers: Map[String,String], body: Vector[Byte]) {
 
   import scala.collection.JavaConverters._
   def toVertexFrame: Frame = {
-    println(body.toArray.toString)
     new Frame().setCommand(Frame.Command.SEND).setHeaders(headers.asJava).setBody(VertxBuffer.buffer(body.toArray))
   }
 }
