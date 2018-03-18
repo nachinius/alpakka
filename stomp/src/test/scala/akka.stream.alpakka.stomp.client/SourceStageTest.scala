@@ -33,12 +33,12 @@ class SourceStageTest extends ClientTest {
       val (futConnected: Future[Done], futHead: Future[Frame]) = source.toMat(sink)(Keep.both).run()
 
       // to make a predictable test, wait until graph connects to stomp server
-      Await.ready(futConnected, 2.seconds)
+      Await.ready(futConnected, patience)
 
       // create another connection, to send to the stomp topic we have registered in SourceStage
       val futstompClient = settings.connectionProvider.get
       val msg = "Hola source"
-      val stomp = Await.result(futstompClient, 2.seconds)
+      val stomp = Await.result(futstompClient, patience)
 
       stomp.send(new Frame().setCommand(Frame.Command.SEND).setDestination(topic).setBody(VertxBuffer.buffer(msg)))
 
@@ -69,11 +69,11 @@ class SourceStageTest extends ClientTest {
       val (futConnected,sub) = source.toMat(sink)(Keep.both).run()
 
       // to make a predictable test, wait until graph connects to stomp server
-      Await.ready(futConnected, 2.seconds)
+      Await.ready(futConnected, patience)
 
       // create another connection, to send to the stomp topic we have registered in SourceStage
       val futstompClient = settings.connectionProvider.get
-      val stomp = Await.result(futstompClient, 2.seconds)
+      val stomp = Await.result(futstompClient, patience)
 
       def sendToStomp(msg: String) = {
         stomp.send(new Frame().setCommand(Frame.Command.SEND).setDestination(topic).setBody(VertxBuffer.buffer(msg)))

@@ -13,10 +13,10 @@ object Server {
 
 //  val vertx: Vertx = Vertx.vertx(new VertxOptions().setBlockedThreadCheckInterval(10))
   val vertx = Vertx.vertx()
-  val patience: FiniteDuration = 1.seconds
+  val patienceWithServer: FiniteDuration = 1.seconds
 
   def getStompServer(handler: Option[StompServerHandler] = None, port: Int = 61613): StompServer =
-    Await.result(stompServerFuture(handler,port), patience)
+    Await.result(stompServerFuture(handler,port), patienceWithServer)
 
   private def stompServerFuture(handler: Option[StompServerHandler] = None, port: Int = 61613) = {
     val serverHandler = handler.getOrElse(StompServerHandler.create(vertx))
@@ -42,7 +42,7 @@ object Server {
         if (ar.succeeded()) promise.success(Done)
         else promise.failure(ar.cause())
     )
-    Await.ready(promise.future, patience)
+    Await.ready(promise.future, patienceWithServer)
   }
 
   def accumulateHandler(accumulator: Frame => Unit): StompServerHandler =
