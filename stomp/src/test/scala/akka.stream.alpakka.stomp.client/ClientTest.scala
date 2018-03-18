@@ -17,7 +17,6 @@ trait ClientTest extends WordSpec
   implicit val system = ActorSystem(this.getClass.getSimpleName)
   implicit val materializer = ActorMaterializer()(system)
 
-  val vertx: Vertx = Vertx.vertx(new VertxOptions().setBlockedThreadCheckInterval(10))
 
   override implicit val patienceConfig = PatienceConfig(1.seconds)
   implicit val executionContext = ExecutionContexts.sameThreadExecutionContext
