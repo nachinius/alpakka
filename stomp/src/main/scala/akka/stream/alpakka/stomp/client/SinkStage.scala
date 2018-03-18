@@ -7,22 +7,21 @@ package akka.stream.alpakka.stomp.client
 import akka.Done
 import akka.stream.stage.{GraphStageLogic, GraphStageWithMaterializedValue, InHandler}
 import akka.stream.{ActorAttributes, Attributes, Inlet, SinkShape}
-import io.vertx.ext.stomp.{Frame, StompClientConnection}
+import io.vertx.ext.stomp.{StompClientConnection}
 
 import scala.concurrent.{Future, Promise}
 
-// @TODO: must change vertx.*.Frame to a immutable one at the stream level
 final class SinkStage(settings: ConnectorSettings)
-    extends GraphStageWithMaterializedValue[SinkShape[Frame], Future[Done]] {
+    extends GraphStageWithMaterializedValue[SinkShape[SendingFrame], Future[Done]] {
   stage =>
 
-  override def shape: SinkShape[Frame] = SinkShape.of(in)
+  override def shape: SinkShape[SendingFrame] = SinkShape.of(in)
 
   override def toString: String = "StompClientSink"
 
   override protected def initialAttributes: Attributes = SinkStage.defaultAttributes
 
-  val in = Inlet[Frame]("StompClientSink.in")
+  val in = Inlet[SendingFrame]("StompClientSink.in")
 
   override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[Done]) = {
     val thePromise = Promise[Done]()
@@ -52,12 +51,14 @@ final class SinkStage(settings: ConnectorSettings)
           }
 
           override def onPush(): Unit = {
-            val originalFrame = grab(in)
+            val originalFrame: SendingFrame = grab(in)
             //            checkCommand(originalFrame)
             //            prepareExpectationOnReceipt(originalFrame)
-            if (settings.topic.nonEmpty)
-              originalFrame.setDestination(settings.topic.get)
-            connection.send(originalFrame)
+            val vertxFrame = originalFrame.toVertexFrame
+            if (settings.topic.nonEmpty) {
+              vertxFrame.setDestination(settings.topic.get)
+            }
+            connection.send(vertxFrame)
             pull(in)
           }
         }
