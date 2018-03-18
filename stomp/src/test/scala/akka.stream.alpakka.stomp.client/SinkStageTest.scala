@@ -29,9 +29,9 @@ class SinkStageTest extends ClientTest {
       val settings = ConnectorSettings(connectionProvider = DetailsConnectionProvider("localhost",port))
 
       // functionality to test
-      val sinkToStomp: Sink[Frame, Future[Done]] = Sink.fromGraph(new SinkStage(settings))
-      val queueSource: Source[Frame, SourceQueueWithComplete[Frame]] =
-        Source.queue[Frame](100, OverflowStrategy.backpressure)
+      val sinkToStomp: Sink[SendingFrame, Future[Done]] = Sink.fromGraph(new SinkStage(settings))
+      val queueSource: Source[SendingFrame, SourceQueueWithComplete[SendingFrame]] =
+        Source.queue[SendingFrame](100, OverflowStrategy.backpressure)
       val (queue, sinkDone) = queueSource.toMat(sinkToStomp)(Keep.both).run()
 
       (1 to size)
@@ -40,6 +40,7 @@ class SinkStageTest extends ClientTest {
         .map({ vBufferStr =>
           new Frame().setDestination(topic).setCommand(Frame.Command.SEND).setBody(vBufferStr)
         })
+        .map { SendingFrame.from }
         .map { frame =>
           queue.offer(frame)
         }

@@ -27,10 +27,10 @@ class SourceStageTest extends ClientTest {
 
 
       // testing source
-      val sink = Sink.head[Frame]
-      val source: Source[Frame, Future[Done]] = Source.fromGraph(new SourceStage(settings ))
+      val sink = Sink.head[SendingFrame]
+      val source: Source[SendingFrame, Future[Done]] = Source.fromGraph(new SourceStage(settings ))
 
-      val (futConnected: Future[Done], futHead: Future[Frame]) = source.toMat(sink)(Keep.both).run()
+      val (futConnected: Future[Done], futHead: Future[SendingFrame]) = source.toMat(sink)(Keep.both).run()
 
       // to make a predictable test, wait until graph connects to stomp server
       Await.ready(futConnected, patience)
@@ -42,7 +42,7 @@ class SourceStageTest extends ClientTest {
 
       stomp.send(new Frame().setCommand(Frame.Command.SEND).setDestination(topic).setBody(VertxBuffer.buffer(msg)))
 
-      futHead.futureValue.getBodyAsString shouldBe msg
+      futHead.futureValue.body.map(_.toChar).mkString("") shouldBe msg
 
       closeAwaitStompServer(server)
     }
@@ -64,7 +64,7 @@ class SourceStageTest extends ClientTest {
 
       // testing source
       val sink = TestSink.probe[String]
-      val source: Source[String, Future[Done]] = Source.fromGraph(new SourceStage(settings)).map(_.getBodyAsString)
+      val source: Source[String, Future[Done]] = Source.fromGraph(new SourceStage(settings)).map(_.body.map(_.toChar).mkString(""))
 
       val (futConnected,sub) = source.toMat(sink)(Keep.both).run()
 

@@ -13,10 +13,10 @@ import scala.collection.{JavaConverters, mutable}
 import scala.concurrent.{Future, Promise}
 
 final class SourceStage(settings: ConnectorSettings)
-  extends GraphStageWithMaterializedValue[SourceShape[Frame], Future[Done]] {
+  extends GraphStageWithMaterializedValue[SourceShape[SendingFrame], Future[Done]] {
   stage =>
 
-  val out = Outlet[Frame]("StompClientSource.out")
+  val out = Outlet[SendingFrame]("StompClientSource.out")
 
   override def createLogicAndMaterializedValue(inheritedAttributes: Attributes): (GraphStageLogic, Future[Done]) = {
     val thePromise = Promise[Done]()
@@ -77,7 +77,7 @@ final class SourceStage(settings: ConnectorSettings)
 
 
       def pushMessage(frame: Frame): Unit = {
-        push(out, frame)
+        push(out, SendingFrame.from(frame))
         pending = None
         acknowledge(frame)
       }
@@ -96,7 +96,7 @@ final class SourceStage(settings: ConnectorSettings)
     (graphStageLogic, thePromise.future)
   }
 
-  override def shape: SourceShape[Frame] = SourceShape.of(out)
+  override def shape: SourceShape[SendingFrame] = SourceShape.of(out)
 
   override def toString: String = "StompClientSink"
 
