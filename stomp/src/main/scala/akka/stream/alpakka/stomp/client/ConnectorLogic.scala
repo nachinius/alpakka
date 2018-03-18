@@ -13,7 +13,7 @@ import scala.concurrent.Promise
 private[client] trait ConnectorLogic {
   this: GraphStageLogic =>
 
-  val closeCallback = getAsyncCallback[StompClientConnection](conn => {
+  val closeCallback = getAsyncCallback[StompClientConnection](_ => {
     promise.trySuccess(Done)
     completeStage()
   })
@@ -31,14 +31,13 @@ private[client] trait ConnectorLogic {
     failStage(ex)
   })
   val fullFillOnConnection = false
-  var expectedReceiptId: Option[String] = None
   var connection: StompClientConnection = _
 
   def settings: ConnectorSettings
 
   def promise: Promise[Done]
 
-  def whenConnected: Unit
+  def whenConnected(): Unit
 
   def onFailure(ex: Throwable): Unit
 
@@ -71,7 +70,7 @@ private[client] trait ConnectorLogic {
     }
   }
 
-  def addHandlers = {
+  def addHandlers() = {
     failHandler(connection)
     closeHandler(connection)
     errorHandler(connection)

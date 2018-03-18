@@ -18,12 +18,13 @@ trait ClientTest extends WordSpec
   implicit val materializer = ActorMaterializer()(system)
 
 
-  override implicit val patienceConfig = PatienceConfig(1.seconds)
+  val patience = 1.seconds
+
+  override implicit val patienceConfig = PatienceConfig(patience)
   implicit val executionContext = ExecutionContexts.sameThreadExecutionContext
 
   override def afterAll(): Unit = {
     system.terminate()
-    vertx.close()
     super.afterAll()
   }
 }
