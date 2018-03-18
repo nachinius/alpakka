@@ -58,12 +58,6 @@ final class SinkStage(settings: ConnectorSettings)
             if (settings.topic.nonEmpty)
               originalFrame.setDestination(settings.topic.get)
             connection.send(originalFrame)
-            if (expectedReceiptId.isEmpty) {
-              pull(in)
-            } else {
-              // will call pull(in) when receiving receipt
-              // it's handle at connection.receivedFrameHandler
-            }
           }
         }
       )
