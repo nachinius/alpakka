@@ -68,9 +68,7 @@ final class SourceStage(settings: ConnectorSettings)
       setHandler(
         out,
         new OutHandler {
-          override def onPull(): Unit = if (pending.nonEmpty) {
-            pushMessage(pending.get)
-          }
+          override def onPull(): Unit = pending.foreach(pushMessage)
 
           override def onDownstreamFinish(): Unit =
             completeStage()

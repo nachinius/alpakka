@@ -67,7 +67,6 @@ private[client] trait ConnectorLogic {
 
   def acknowledge(frame: Frame) = {
     if(settings.withAck && frame.getHeaders.containsKey(Frame.ACK)) {
-      println("ack " + frame.getAck)
       connection.ack(frame.getAck)
     }
   }
