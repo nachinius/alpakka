@@ -58,6 +58,7 @@ final class SinkStage(settings: ConnectorSettings)
             if (settings.topic.nonEmpty)
               originalFrame.setDestination(settings.topic.get)
             connection.send(originalFrame)
+            pull(in)
           }
         }
       )

@@ -17,15 +17,18 @@ class SinkStageTest extends ClientTest {
   "A Stomp Client SinkStage" should {
     "deliver message to a stomp server" in {
 
+      // creating a stomp server
       import Server._
       var receivedFrameOnServer: ArrayBuffer[Frame] = ArrayBuffer()
       val port = 61666
       val server = getStompServer(Some(accumulateHandler(f => receivedFrameOnServer += f)), port)
 
+      // connection settings
       val topic = "AnyTopic"
       val size = 10
       val settings = ConnectorSettings(connectionProvider = DetailsConnectionProvider("localhost",port))
 
+      // functionality to test
       val sinkToStomp: Sink[Frame, Future[Done]] = Sink.fromGraph(new SinkStage(settings))
       val queueSource: Source[Frame, SourceQueueWithComplete[Frame]] =
         Source.queue[Frame](100, OverflowStrategy.backpressure)
@@ -41,8 +44,7 @@ class SinkStageTest extends ClientTest {
           queue.offer(frame)
         }
       queue.complete()
-
-      //      queue.watchCompletion().futureValue shouldBe Done
+//      queue.watchCompletion().futureValue shouldBe Done
       sinkDone.futureValue shouldBe Done
 
       receivedFrameOnServer
