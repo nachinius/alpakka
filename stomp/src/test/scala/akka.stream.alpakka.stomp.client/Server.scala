@@ -11,6 +11,7 @@ import scala.concurrent.duration._
 
 object Server {
 
+//  val vertx: Vertx = Vertx.vertx(new VertxOptions().setBlockedThreadCheckInterval(10))
   val vertx = Vertx.vertx()
   val patience: FiniteDuration = 1.seconds
 
