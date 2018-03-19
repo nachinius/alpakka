@@ -9,11 +9,11 @@ import akka.stream._
 import akka.stream.stage._
 import io.vertx.ext.stomp.{Frame, StompClientConnection}
 
-import scala.collection.{JavaConverters, mutable}
+import scala.collection.{mutable, JavaConverters}
 import scala.concurrent.{Future, Promise}
 
 final class SourceStage(settings: ConnectorSettings)
-  extends GraphStageWithMaterializedValue[SourceShape[SendingFrame], Future[Done]] {
+    extends GraphStageWithMaterializedValue[SourceShape[SendingFrame], Future[Done]] {
   stage =>
 
   val out = Outlet[SendingFrame]("StompClientSource.out")
@@ -32,8 +32,8 @@ final class SourceStage(settings: ConnectorSettings)
 
       var pending: Option[Frame] = None
       override def whenConnected: Unit = {
-        val receiveSubscriptionMessage = getAsyncCallback[Frame] {
-          frame => {
+        val receiveSubscriptionMessage = getAsyncCallback[Frame] { frame =>
+          {
             pending = Some(frame)
             handleDelivery(frame)
           }
@@ -45,25 +45,23 @@ final class SourceStage(settings: ConnectorSettings)
           settings.topic.get,
           headers.asJava, { frame =>
             receiveSubscriptionMessage.invoke(frame)
-          }, { frameSubscribe => acknowledge(frameSubscribe)
+          }, { frameSubscribe =>
+            acknowledge(frameSubscribe)
           }
         )
       }
 
-
-      override def receiveHandler(connection: StompClientConnection): Unit = {
-        connection.receivedFrameHandler( frame => {
-          if(!settings.topic.contains(frame.getDestination)) {
+      override def receiveHandler(connection: StompClientConnection): Unit =
+        connection.receivedFrameHandler(frame => {
+          if (!settings.topic.contains(frame.getDestination)) {
             acknowledge(frame)
           }
         })
-      }
 
-      def handleDelivery(frame: Frame): Unit = {
+      def handleDelivery(frame: Frame): Unit =
         if (isAvailable(out)) {
           pushMessage(frame)
         }
-      }
 
       setHandler(
         out,
@@ -74,7 +72,6 @@ final class SourceStage(settings: ConnectorSettings)
             completeStage()
         }
       )
-
 
       def pushMessage(frame: Frame): Unit = {
         push(out, SendingFrame.from(frame))

@@ -31,7 +31,6 @@ final class SinkStage(settings: ConnectorSettings)
       //      private val destination = settings.destination
       //      private val requestReceiptHandler: Option[Frame => ()] = settings.requestReceiptHandler
 
-
       override def receiveHandler(connection: StompClientConnection): Unit = ()
 
       override def whenConnected: Unit = pull(in)
@@ -82,5 +81,3 @@ object SinkStage {
   private val defaultAttributes =
     Attributes.name("StompClientSink").and(ActorAttributes.dispatcher("akka.stream.default-blocking-io-dispatcher"))
 }
-
-

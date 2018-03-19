@@ -1,8 +1,19 @@
+/*
+ * Copyright (C) 2016-2018 Lightbend Inc. <http://www.lightbend.com>
+ */
+
 package akka.stream.alpakka.stomp.client
 
 import akka.Done
 import io.vertx.core.Vertx
-import io.vertx.ext.stomp.{Destination, Frame, StompServer, StompServerConnection, StompServerHandler, StompServerOptions}
+import io.vertx.ext.stomp.{
+  Destination,
+  Frame,
+  StompServer,
+  StompServerConnection,
+  StompServerHandler,
+  StompServerOptions
+}
 import io.vertx.ext.stomp.impl.Topic
 import io.vertx.ext.stomp.impl.Topic.Subscription
 
@@ -16,7 +27,7 @@ object Server {
   val patienceWithServer: FiniteDuration = 1.seconds
 
   def getStompServer(handler: Option[StompServerHandler] = None, port: Int = 61613): StompServer =
-    Await.result(stompServerFuture(handler,port), patienceWithServer)
+    Await.result(stompServerFuture(handler, port), patienceWithServer)
 
   private def stompServerFuture(handler: Option[StompServerHandler] = None, port: Int = 61613) = {
     val serverHandler = handler.getOrElse(StompServerHandler.create(vertx))
@@ -30,7 +41,7 @@ object Server {
             promise success ar.result()
           } else {
             promise failure ar.cause()
-          }
+        }
       )
     promise.future
   }
@@ -55,28 +66,27 @@ object Server {
         }
       })
 
-
-  def stompServerWithTopicAndQueue(port: Int): StompServer = {
+  def stompServerWithTopicAndQueue(port: Int): StompServer =
     getStompServer(
       Some(
         StompServerHandler
           .create(vertx)
           .destinationFactory((v, name) => {
-              new StompServerTopic(v, name)
+            new StompServerTopic(v, name)
           })
-      ), port
+      ),
+      port
     )
-  }
 
   /**
-    * Describe a topic in the stomp server, that is able to `feel` the ack.
-    *
-    * Current vertx-stomp-server with vertx-stomp-server-topic does not handle the `ack`. We extend the default Topic implementation in order to handle a Queues of messages and ack of them.
-    *
-    * @param vertx
-    * @param destination
-    */
-  class StompServerTopic(vertx: Vertx, destination: String) extends Topic(vertx,destination) {
+   * Describe a topic in the stomp server, that is able to `feel` the ack.
+   *
+   * Current vertx-stomp-server with vertx-stomp-server-topic does not handle the `ack`. We extend the default Topic implementation in order to handle a Queues of messages and ack of them.
+   *
+   * @param vertx
+   * @param destination
+   */
+  class StompServerTopic(vertx: Vertx, destination: String) extends Topic(vertx, destination) {
     import collection.mutable.{Queue => mQueue}
     case class Subs(stompServerConnection: StompServerConnection,
                     var waitingAck: Option[String] = None,
@@ -84,11 +94,11 @@ object Server {
 
     var internalSubs: Map[Subscription, Subs] = Map()
 
-    override def subscribe(connection: StompServerConnection, frame: Frame): Destination ={
+    override def subscribe(connection: StompServerConnection, frame: Frame): Destination = {
       super.subscribe(connection, frame)
       // hack to be able to access the connection
       val i = subscriptions.size()
-      val last = subscriptions.get(i-1)
+      val last = subscriptions.get(i - 1)
       internalSubs = internalSubs + (last -> Subs(connection))
       this
     }
@@ -96,11 +106,15 @@ object Server {
     override def ack(connection: StompServerConnection, frame: Frame): Boolean = {
       val ack = frame.getId
 
-      internalSubs.find(_._2.stompServerConnection == connection).find(_._2.waitingAck.contains(ack)).map {
-        case (subscription: Subscription, subs: Subs) =>
-          subs.waitingAck = None
-          if(subs.pendingFrames.nonEmpty) deliver(subs,subscription,subs.pendingFrames.dequeue())
-      }.nonEmpty
+      internalSubs
+        .find(_._2.stompServerConnection == connection)
+        .find(_._2.waitingAck.contains(ack))
+        .map {
+          case (subscription: Subscription, subs: Subs) =>
+            subs.waitingAck = None
+            if (subs.pendingFrames.nonEmpty) deliver(subs, subscription, subs.pendingFrames.dequeue())
+        }
+        .nonEmpty
     }
 
     def deliver(subs: Subs, subscription: Subscription, frame: Frame): StompServerConnection = {
@@ -108,24 +122,23 @@ object Server {
 
       val messageId = java.util.UUID.randomUUID().toString
       val message = Topic.transform(frame, subscription, messageId)
-      if(message.getHeaders.asScala.contains(Frame.ACK)) {
+      if (message.getHeaders.asScala.contains(Frame.ACK)) {
         subs.waitingAck = Some(message.getAck)
       }
       subs.stompServerConnection.write(message)
     }
-    def enqueue(subs: Subs, frame: Frame): Unit = {
+    def enqueue(subs: Subs, frame: Frame): Unit =
       subs.pendingFrames.enqueue(frame)
-    }
 
     override def dispatch(connection: StompServerConnection, frame: Frame): Destination = {
       import collection.JavaConverters._
       val coll = for {
         subscription <- subscriptions.asScala
         sub: Subs <- internalSubs.get(subscription)
-      } yield (sub,subscription)
+      } yield (sub, subscription)
       coll.foreach {
         case (subs: Subs, subscription: Subscription) if subs.waitingAck.isEmpty =>
-          deliver(subs,subscription,frame)
+          deliver(subs, subscription, frame)
         case (subs, _) => enqueue(subs, frame)
       }
       this

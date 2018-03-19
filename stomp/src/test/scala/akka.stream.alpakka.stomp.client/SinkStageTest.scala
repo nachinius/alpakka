@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2018 Lightbend Inc. <http://www.lightbend.com>
+ */
+
 package akka.stream.alpakka.stomp.client
 
 import akka.Done
@@ -26,7 +30,7 @@ class SinkStageTest extends ClientTest {
       // connection settings
       val topic = "AnyTopic"
       val size = 10
-      val settings = ConnectorSettings(connectionProvider = DetailsConnectionProvider("localhost",port))
+      val settings = ConnectorSettings(connectionProvider = DetailsConnectionProvider("localhost", port))
 
       // functionality to test
       val sinkToStomp: Sink[SendingFrame, Future[Done]] = Sink.fromGraph(new SinkStage(settings))

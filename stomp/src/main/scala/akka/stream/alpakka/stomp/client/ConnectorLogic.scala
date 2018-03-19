@@ -64,11 +64,10 @@ private[client] trait ConnectorLogic {
       )
   }
 
-  def acknowledge(frame: Frame) = {
-    if(settings.withAck && frame.getHeaders.containsKey(Frame.ACK)) {
+  def acknowledge(frame: Frame) =
+    if (settings.withAck && frame.getHeaders.containsKey(Frame.ACK)) {
       connection.ack(frame.getAck)
     }
-  }
 
   def addHandlers() = {
     failHandler(connection)

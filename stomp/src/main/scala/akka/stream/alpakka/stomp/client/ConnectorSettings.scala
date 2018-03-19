@@ -22,10 +22,9 @@ case class ConnectorSettings(
     withAck: Boolean = false
 )
 
-
 trait ConnectionProvider {
   def vertx: Vertx = Vertx.vertx()
-  val noHeartBeatObject = new JsonObject().put("x",0).put("y",0)
+  val noHeartBeatObject = new JsonObject().put("x", 0).put("y", 0)
 
   def stompClientOptions: StompClientOptions
 
@@ -54,21 +53,22 @@ trait ConnectionProvider {
  * Connects to a local STOMP server at the default port with no password.
  */
 case object LocalConnectionProvider extends ConnectionProvider {
-  val stompClientOptions: StompClientOptions = DetailsConnectionProvider("0.0.0.0",61613).stompClientOptions.setHeartbeat(noHeartBeatObject)
+  val stompClientOptions: StompClientOptions =
+    DetailsConnectionProvider("0.0.0.0", 61613).stompClientOptions.setHeartbeat(noHeartBeatObject)
 }
 
 final case class Credentials(
-                            username: String,
-                            password: String
-                            ) {
+    username: String,
+    password: String
+) {
   override def toString: String = s"Credentials($username,*****)"
 }
 
 final case class DetailsConnectionProvider(
-                                          host: String,
-                                          port: Int,
-                                          credentials: Option[Credentials] = None
-                                          ) extends ConnectionProvider {
+    host: String,
+    port: Int,
+    credentials: Option[Credentials] = None
+) extends ConnectionProvider {
 
   def stompClientOptions: StompClientOptions = {
     val opt = new StompClientOptions()

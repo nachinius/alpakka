@@ -1,3 +1,7 @@
+/*
+ * Copyright (C) 2016-2018 Lightbend Inc. <http://www.lightbend.com>
+ */
+
 package akka.stream.alpakka.stomp.client
 
 import akka.Done
@@ -20,15 +24,11 @@ class SourceStageTest extends ClientTest {
       val server = stompServerWithTopicAndQueue(port)
 
       val topic = "/topic/topic2"
-      val settings = ConnectorSettings(
-        DetailsConnectionProvider("localhost",port,None),
-        Some(topic),
-        false)
-
+      val settings = ConnectorSettings(DetailsConnectionProvider("localhost", port, None), Some(topic), false)
 
       // testing source
       val sink = Sink.head[SendingFrame]
-      val source: Source[SendingFrame, Future[Done]] = Source.fromGraph(new SourceStage(settings ))
+      val source: Source[SendingFrame, Future[Done]] = Source.fromGraph(new SourceStage(settings))
 
       val (futConnected: Future[Done], futHead: Future[SendingFrame]) = source.toMat(sink)(Keep.both).run()
 
@@ -55,18 +55,15 @@ class SourceStageTest extends ClientTest {
       val port = 61613
       val server = stompServerWithTopicAndQueue(port)
       val topic = "/topic/mytopic"
-      val connectionProvider = DetailsConnectionProvider("localhost",port)
-      val settings = ConnectorSettings(
-        connectionProvider = connectionProvider,
-        withAck = true,
-        topic = Some(topic))
-
+      val connectionProvider = DetailsConnectionProvider("localhost", port)
+      val settings = ConnectorSettings(connectionProvider = connectionProvider, withAck = true, topic = Some(topic))
 
       // testing source
       val sink = TestSink.probe[String]
-      val source: Source[String, Future[Done]] = Source.fromGraph(new SourceStage(settings)).map(_.body.map(_.toChar).mkString(""))
+      val source: Source[String, Future[Done]] =
+        Source.fromGraph(new SourceStage(settings)).map(_.body.map(_.toChar).mkString(""))
 
-      val (futConnected,sub) = source.toMat(sink)(Keep.both).run()
+      val (futConnected, sub) = source.toMat(sink)(Keep.both).run()
 
       // to make a predictable test, wait until graph connects to stomp server
       Await.ready(futConnected, patience)
@@ -75,9 +72,8 @@ class SourceStageTest extends ClientTest {
       val futstompClient = settings.connectionProvider.get
       val stomp = Await.result(futstompClient, patience)
 
-      def sendToStomp(msg: String) = {
+      def sendToStomp(msg: String) =
         stomp.send(new Frame().setCommand(Frame.Command.SEND).setDestination(topic).setBody(VertxBuffer.buffer(msg)))
-      }
 
       sub.request(1)
       sendToStomp("1")
@@ -98,7 +94,7 @@ class SourceStageTest extends ClientTest {
       sendToStomp("9")
       sendToStomp("10")
       sendToStomp("11")
-      sub.expectNext("5","6","7","8")
+      sub.expectNext("5", "6", "7", "8")
       sub.expectNoMessage(500.millisecond)
       sub.requestNext("9")
       sub.requestNext("10")
