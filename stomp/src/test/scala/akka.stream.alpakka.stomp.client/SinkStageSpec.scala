@@ -16,7 +16,7 @@ import io.vertx.core.buffer.{Buffer => VertxBuffer}
 
 import scala.collection.mutable.ArrayBuffer
 
-class SinkStageTest extends ClientTest {
+class SinkStageSpec extends StompClientSpec {
 
   "A Stomp Client SinkStage" should {
     "deliver message to a stomp server" in {

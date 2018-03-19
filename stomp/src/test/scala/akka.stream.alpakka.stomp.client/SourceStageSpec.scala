@@ -13,7 +13,7 @@ import scala.concurrent.duration._
 import io.vertx.core.buffer.{Buffer => VertxBuffer}
 import akka.stream.testkit.scaladsl.TestSink
 
-class SourceStageTest extends ClientTest {
+class SourceStageSpec extends StompClientSpec {
 
   "A Stomp Client SourceStage" should {
     "receive a message published in a topic of a stomp server" in {
@@ -46,9 +46,7 @@ class SourceStageTest extends ClientTest {
 
       closeAwaitStompServer(server)
     }
-    //========================================
-    //========================================
-    //========================================
+
     "receive sequentially the messages received in a stomp server when ack them" in {
 
       import Server._
@@ -104,6 +102,7 @@ class SourceStageTest extends ClientTest {
       sendToStomp("12")
       sub.expectNext("12")
 
+      closeAwaitStompServer(server)
     }
   }
 

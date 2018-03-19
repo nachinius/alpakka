@@ -6,10 +6,13 @@ package akka.stream.alpakka.stomp.client
 
 import akka.Done
 import akka.stream.stage.GraphStageLogic
-import io.vertx.ext.stomp.{Frame, StompClientConnection}
+import io.vertx.ext.stomp.{Frame => VertxFrame, StompClientConnection}
 
 import scala.concurrent.Promise
 
+/**
+ * Shared logic for Source and Sink
+ */
 private[client] trait ConnectorLogic {
   this: GraphStageLogic =>
 
@@ -17,7 +20,7 @@ private[client] trait ConnectorLogic {
     promise.trySuccess(Done)
     completeStage()
   })
-  val errorCallback = getAsyncCallback[Frame](frame => {
+  val errorCallback = getAsyncCallback[VertxFrame](frame => {
     acknowledge(frame)
     val ex = StompProtocolError(frame)
     failCallback.invoke(ex)
@@ -64,8 +67,8 @@ private[client] trait ConnectorLogic {
       )
   }
 
-  def acknowledge(frame: Frame) =
-    if (settings.withAck && frame.getHeaders.containsKey(Frame.ACK)) {
+  def acknowledge(frame: VertxFrame) =
+    if (settings.withAck && frame.getHeaders.containsKey(VertxFrame.ACK)) {
       connection.ack(frame.getAck)
     }
 
@@ -81,17 +84,29 @@ private[client] trait ConnectorLogic {
 
   def writeHandler(connection: StompClientConnection) = ()
 
+  /**
+   * When a message is received by the connection
+   */
   def receiveHandler(connection: StompClientConnection)
 
   def dropHandler(connection: StompClientConnection) =
     connection.connectionDroppedHandler(dropped => dropCallback.invoke(dropped))
 
+  /**
+   * An ERROR frame is received
+   */
   def errorHandler(connection: StompClientConnection) =
     connection.errorHandler(frame => errorCallback.invoke(frame))
 
+  /**
+   * When connection get closed
+   */
   def closeHandler(connection: StompClientConnection) =
     connection.closeHandler(conn => closeCallback.invoke(conn))
 
+  /**
+   * Upon TCP-errors
+   */
   private def failHandler(connection: StompClientConnection) =
     connection.exceptionHandler(ex => failCallback.invoke(ex))
 

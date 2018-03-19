@@ -11,6 +11,10 @@ import io.vertx.ext.stomp.{StompClientConnection}
 
 import scala.concurrent.{Future, Promise}
 
+/**
+ * Connects to a STOMP server upon materialization and sends incoming messages to the server.
+ * Each materialized sink will create one connection to the server.
+ */
 final class SinkStage(settings: ConnectorSettings)
     extends GraphStageWithMaterializedValue[SinkShape[SendingFrame], Future[Done]] {
   stage =>
@@ -28,8 +32,6 @@ final class SinkStage(settings: ConnectorSettings)
     (new GraphStageLogic(shape) with ConnectorLogic {
       override val settings: ConnectorSettings = stage.settings
       override val promise = thePromise
-      //      private val destination = settings.destination
-      //      private val requestReceiptHandler: Option[Frame => ()] = settings.requestReceiptHandler
 
       override def receiveHandler(connection: StompClientConnection): Unit = ()
 
@@ -40,19 +42,17 @@ final class SinkStage(settings: ConnectorSettings)
         new InHandler {
 
           override def onUpstreamFailure(ex: Throwable): Unit = {
-            promise.failure(ex)
+            promise.tryFailure(ex)
             super.onUpstreamFailure(ex)
           }
 
           override def onUpstreamFinish(): Unit = {
-            promise.success(Done)
+            promise.trySuccess(Done)
             super.onUpstreamFinish()
           }
 
           override def onPush(): Unit = {
             val originalFrame: SendingFrame = grab(in)
-            //            checkCommand(originalFrame)
-            //            prepareExpectationOnReceipt(originalFrame)
             val vertxFrame = originalFrame.toVertexFrame
             if (settings.topic.nonEmpty) {
               vertxFrame.setDestination(settings.topic.get)
@@ -64,7 +64,6 @@ final class SinkStage(settings: ConnectorSettings)
       )
 
       override def postStop(): Unit = {
-        //        if(connection != null) connection.disconnect()
         promise.tryFailure(new RuntimeException("stage stopped unexpectedly"))
         super.postStop()
       }

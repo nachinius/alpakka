@@ -12,7 +12,7 @@ import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach, Matchers, WordSpec}
 import scala.concurrent.duration._
 
-trait ClientTest extends WordSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScalaFutures {
+trait StompClientSpec extends WordSpec with Matchers with BeforeAndAfterAll with BeforeAndAfterEach with ScalaFutures {
 
   implicit val system = ActorSystem(this.getClass.getSimpleName)
   implicit val materializer = ActorMaterializer()(system)

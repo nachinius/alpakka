@@ -20,7 +20,12 @@ case class ConnectorSettings(
     connectionProvider: ConnectionProvider,
     topic: Option[String] = None,
     withAck: Boolean = false
-)
+) {
+  def withConnectionProvider(other: ConnectionProvider) = copy(connectionProvider = other)
+  def withTopic(other: Option[String]) = copy(topic = other)
+  def withAck(other: Boolean) = copy(withAck = other)
+
+}
 
 trait ConnectionProvider {
   def vertx: Vertx = Vertx.vertx()
@@ -50,7 +55,7 @@ trait ConnectionProvider {
 }
 
 /**
- * Connects to a local STOMP server at the default port with no password.
+ * Connects to a local STOMP server at the default port with no credentials.
  */
 case object LocalConnectionProvider extends ConnectionProvider {
   val stompClientOptions: StompClientOptions =

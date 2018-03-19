@@ -12,6 +12,10 @@ import io.vertx.ext.stomp.{Frame, StompClientConnection}
 import scala.collection.{mutable, JavaConverters}
 import scala.concurrent.{Future, Promise}
 
+/**
+ * Connects to a STOMP server upon materialization and receives incoming messages from the server to the stream.
+ * Each materialized sink will create one connection to the server.
+ */
 final class SourceStage(settings: ConnectorSettings)
     extends GraphStageWithMaterializedValue[SourceShape[SendingFrame], Future[Done]] {
   stage =>
