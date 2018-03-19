@@ -100,12 +100,4 @@ private[client] trait ConnectorLogic {
   override def postStop(): Unit =
     if (connection.isConnected) connection.disconnect()
 
-  /** remember to call if overriding! */
-  override def postStop(): Unit =
-    if (connection.isConnected) connection.disconnect()
-
-  private def prepareExpectationOnReceipt(originalFrame: Frame) =
-    if (originalFrame.getHeaders.containsKey(Frame.RECEIPT)) {
-      expectedReceiptId = Some(originalFrame.getHeader(Frame.RECEIPT))
-    }
 }
