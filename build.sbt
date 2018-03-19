@@ -149,7 +149,7 @@ lazy val sqs = alpakkaProject("sqs",
 
 lazy val sse = alpakkaProject("sse", "sse", Dependencies.Sse)
 
-lazy val stomp = alpakkaProject("stomp", Dependencies.Stomp)
+lazy val stomp = alpakkaProject("stomp","stomp", Dependencies.Stomp)
 
 lazy val unixdomainsocket = alpakkaProject("unix-domain-socket", "unixdomainsocket", Dependencies.UnixDomainSocket)
 
