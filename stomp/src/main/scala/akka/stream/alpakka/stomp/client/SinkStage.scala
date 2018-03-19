@@ -53,11 +53,13 @@ final class SinkStage(settings: ConnectorSettings)
 
           override def onPush(): Unit = {
             val originalFrame: SendingFrame = grab(in)
+
+            // mutable vertxFrame
             val vertxFrame = originalFrame.toVertexFrame
-            if (settings.topic.nonEmpty) {
-              vertxFrame.setDestination(settings.topic.get)
-            }
+            // will not override if already set
+            settings.topic.foreach(vertxFrame.setDestination)
             connection.send(vertxFrame)
+
             pull(in)
           }
         }
